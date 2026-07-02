@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>💰 AI財務危険度診断 Lite</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f4f4f6;font-family:'Hiragino Sans','Noto Sans JP','Segoe UI',sans-serif;min-height:100vh}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+.header{background:#1e1b4b;color:#fff;padding:16px 16px 14px}
+.header p{font-size:11px;opacity:.6;margin:0 0 3px}
+.header h1{font-size:20px;font-weight:900;margin:0}
+.tabbar{background:#fff;border-bottom:1px solid #e2e8f0;display:flex;position:sticky;top:0;z-index:10}
+.tab{flex:1;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:500;cursor:pointer;border:none;background:none;color:#94a3b8;border-bottom:2.5px solid transparent;transition:color .2s}
+.tab.active{font-weight:700}
+.tab .icon{font-size:18px}
+.body{padding:14px 14px 40px;max-width:440px;margin:0 auto}
+.card{background:#fff;border-radius:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);overflow:hidden;margin-bottom:14px}
+.card-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px}
+.card-body{padding:8px 16px 10px}
+
+/* 月額フィールド */
+.field{padding:8px 0 4px;border-bottom:1px solid #f8fafc}
+.field-label{font-size:11px;color:#64748b;margin-bottom:3px}
+.field-row{display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.field-row .sym{font-size:12px;color:#94a3b8;flex-shrink:0}
+.field-row .unit{font-size:11px;color:#94a3b8;flex-shrink:0;margin-left:2px}
+.field-row input{flex:1;text-align:right;font-size:16px;font-weight:600;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px;outline:none;font-family:inherit;transition:border-color .15s,background .15s}
+/* 日額フィールド（やや小さめ） */
+.field-day{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+.field-day .sym{font-size:11px;color:#b0bac6;flex-shrink:0}
+.field-day .unit{font-size:10px;color:#b0bac6;flex-shrink:0;margin-left:2px}
+.field-day input{flex:1;text-align:right;font-size:14px;font-weight:500;background:#f8fafc;border:1px solid #e8edf2;border-radius:6px;padding:5px 8px;outline:none;font-family:inherit;color:#64748b;transition:border-color .15s,background .15s}
+.field-day input.auto-val{color:#b0bac6;font-style:italic}
+
+.bar-wrap{height:5px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-top:4px}
+.bar{height:100%;border-radius:99px;transition:width .7s ease}
+.hint{border-radius:12px;padding:10px 12px;font-size:12px;margin-bottom:14px;line-height:1.5;border:1px solid}
+.score-card{background:#fff;border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,.07);padding:20px 18px;margin-bottom:14px}
+.gauge-wrap{position:relative;width:132px;height:132px;flex-shrink:0}
+.gauge-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cap-banner{border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;gap:8px;align-items:flex-start;border:1.5px solid}
+.total-box{border-radius:16px;padding:16px;text-align:center}
+.meta-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc}
+.section-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin:0 0 12px}
+.actions-wrap{border-radius:16px;padding:14px 16px;margin-bottom:14px;border:1.5px solid}
+.income-split{background:#fff;border-radius:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);padding:14px 16px}
+</style>
+</head>
+<body onclick="if(event.target.tagName!=='INPUT')document.activeElement.blur()" ontouchstart="">
+<div id="modal-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.3)">
+    <div style="font-size:28px;text-align:center;margin-bottom:12px">⚠️</div>
+    <h2 style="font-size:16px;font-weight:800;color:#1e293b;text-align:center;margin-bottom:16px">ご利用前にご確認ください</h2>
+    <div style="font-size:13px;color:#475569;line-height:1.8;background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:20px">
+      本ツールは<strong>教育・自己分析目的</strong>の参考ツールです。<br>
+      投資判断・税務判断・融資判断には<br>ご利用いただけません。<br><br>
+      結果の正確性・利益を保証するものではありません。
+    </div>
+    <button onclick="document.getElementById('modal-overlay').style.display='none'" style="width:100%;padding:14px;background:#1e1b4b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">同意して利用する</button>
+  </div>
+</div>
+<div class="header">
+  <p>個人事業主・副業経営者向け 財務セルフチェックツール</p>
+  <h1>💰 AI財務危険度診断 Lite</h1>
+</div>
+<div class="tabbar" id="tabbar"></div>
+<div class="body" id="body"></div>
+
+<script>
+const fmt = v => Math.round(v||0).toLocaleString('ja-JP');
+const pct = v => `${Math.round((v||0)*100)}%`;
+const n   = v => parseFloat(v)||0;
+const MAX = 5_000_000;
+
+let currentTab = 'dashboard';
+
+const state = {
+  inc: {
+    salary:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    parttime:  {month:'', day:'', monthAuto:false, dayAuto:false},
+    freelance: {month:'', day:'', monthAuto:false, dayAuto:false},
+    bizOther:  {month:'', day:'', monthAuto:false, dayAuto:false},
+    dividend:  {month:'', day:'', monthAuto:false, dayAuto:false},
+    rental:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    royalty:   {month:'', day:'', monthAuto:false, dayAuto:false},
+    assetOther:{month:'', day:'', monthAuto:false, dayAuto:false},
+  },
+  exp: {
+    housing:      {month:'', day:'', monthAuto:false, dayAuto:false},
+    food:         {month:'', day:'', monthAuto:false, dayAuto:false},
+    utilities:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    insurance:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    transport:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    education:    {month:'', day:'', monthAuto:false, dayAuto:false},
+    entertainment:{month:'', day:'', monthAuto:false, dayAuto:false},
+    other:        {month:'', day:'', monthAuto:false, dayAuto:false},
+  },
+  liab: {mortgage:'', carLoan:'', studentLoan:'', creditCard:'', other:''}
+};
+
+function mVal(obj){ return Math.min(n(obj.month), MAX); }
+
+function calc(){
+  const inc  = state.inc;
+  const exp  = state.exp;
+  const liab = state.liab;
+
+  const laborIn = mVal(inc.salary)+mVal(inc.parttime);
+  const bizIn   = mVal(inc.freelance)+mVal(inc.bizOther);
+  const assetIn = mVal(inc.dividend)+mVal(inc.rental)+mVal(inc.royalty)+mVal(inc.assetOther);
+  const totalIn = laborIn+bizIn+assetIn;
+  const totalEx = Object.values(exp).reduce((s,v)=>s+mVal(v),0);
+  const totalLi = Object.values(liab).reduce((s,v)=>s+Math.min(n(v),MAX),0);
+  const cf=totalIn-totalEx, sr=totalIn>0?cf/totalIn:0;
+  const ar=totalIn>0?assetIn/totalIn:0, nr=totalIn>0?(bizIn+assetIn)/totalIn:0;
+  const dm=totalIn>0?totalLi/totalIn:999, lr=totalIn>0?laborIn/totalIn:0;
+
+  const allZeroEx = Object.values(exp).every(v => mVal(v) === 0);
+  const EXP_MIN = {
+    housing:   5000,
+    food:      3000,
+    utilities:  500,
+    insurance:    0,
+    transport:    0,
+    education:    0,
+    entertainment:0,
+    other:        0,
+  };
+  const invalidEx = !allZeroEx && Object.entries(EXP_MIN).some(([k, minVal]) => {
+    if(minVal === 0) return false;
+    const val = mVal(exp[k]);
+    return val < minVal;
+  });
+
+  let score=0;
+  if(!invalidEx && !allZeroEx){
+    const s1=sr>=.5?25:sr>=.3?20:sr>=.2?15:sr>=.1?10:sr>0?5:0;
+    const s2=Math.min(30,Math.floor(ar*120));
+    const s3=Math.min(25,Math.floor(nr*62));
+    const s4=totalIn===0?0:totalLi===0?20:dm<=6?18:dm<=12?14:dm<=24?10:dm<=36?6:2;
+    const raw=Math.max(1,Math.min(100,s1+s2+s3+s4));
+    let cap=lr>=.8?45:lr>=.6?65:100;
+
+    if(totalIn>0){
+      if(sr<=-5){
+        cap=Math.min(cap,1);
+      }else if(sr<=-3){
+        cap=Math.min(cap,10);
+      }else if(sr<=-1){
+        cap=Math.min(cap,20);
+      }
+    }
+
+    score=Math.min(raw,cap);
+  }
+  return {laborIn,bizIn,assetIn,totalIn,totalEx,totalLi,cf,sr,ar,nr,dm,lr,score,invalidEx,allZeroEx};
+}
+
+function getStage(score, invalidEx){
+  if(score===0 && invalidEx) return {e:'⚠️',label:'入力値を確認中',c:'#d97706',bg:'#fffbeb',border:'#fde68a'};
+  if(score===0) return {e:'📝',label:'データ未入力',c:'#94a3b8',bg:'#f8fafc',border:'#e2e8f0'};
+  if(score<20)  return {e:'🚨',label:'危機的状況',  c:'#dc2626',bg:'#fef2f2',border:'#fecaca'};
+  if(score<40)  return {e:'⚠️', label:'要改善',      c:'#d97706',bg:'#fffbeb',border:'#fde68a'};
+  if(score<60)  return {e:'📈',label:'成長段階',    c:'#2563eb',bg:'#eff6ff',border:'#bfdbfe'};
+  if(score<80)  return {e:'💪',label:'安定・拡張',  c:'#7c3aed',bg:'#f5f3ff',border:'#ddd6fe'};
+  return              {e:'🎯',label:'財務自由圏',  c:'#059669',bg:'#ecfdf5',border:'#a7f3d0'};
+}
+
+function getActions(C){
+  const score=C.score;
+  if(score===0) return ['収入・支出・負債を入力してください','5分で現在の財務状況が判明します'];
+
+  const adv=[];
+  const lp=Math.round(C.lr*100), sp=Math.round(C.sr*100), ap=Math.round(C.ar*100);
+  const dm=C.totalIn>0?Math.round(C.dm):null;
+
+  if(C.cf<0){
+    adv.push(`月${fmt(Math.abs(C.cf))}円の赤字です。このまま1年続くと${fmt(Math.abs(C.cf)*12)}円が失われます。家賃・保険・サブスクの固定費を今週中に書き出してください`);
+  } else if(C.totalIn>0 && C.sr<0.05){
+    adv.push(`貯蓄率${sp}%は危険水域です。給料日に${fmt(Math.round(C.totalIn*0.1))}円（10%）を即座に別口座へ移す「先取り貯蓄」を今月から始めてください`);
+  } else if(C.totalIn>0 && C.sr>=0.2){
+    adv.push(`貯蓄率${sp}%は良好です。余剰${fmt(C.cf)}円のうち半分以上を副業・積立投資に固定投入してください`);
+  } else if(C.totalIn>0){
+    adv.push(`貯蓄率${sp}%（目標20%）。月${fmt(Math.round(C.totalIn*0.2-C.cf))}円の支出削減または収入増で目標ラインに届きます`);
+  }
+
+  if(score>=20 && C.totalIn>0 && C.lr>=0.8){
+    adv.push(`収入の${lp}%が労働収入でスコア上限45点に縛られています。月1万円の事業収入（情報販売・受託等）を作ることが最も効果的な突破口です`);
+  } else if(score>=20 && C.totalIn>0 && C.lr>=0.6){
+    adv.push(`労働収入${lp}%（スコア上限65点）。月${fmt(Math.round(C.totalIn*(C.lr-0.6)))}円分を事業・資産収入に置き換えると上限が外れます`);
+  }
+
+  if(score>=20 && C.totalIn>0 && C.assetIn===0){
+    adv.push(`資産収入ゼロです。月3,000円から配当ETFの積立を始めると「寝ていても入る収入」の時間軸が今日から動き始めます`);
+  } else if(score>=20 && C.totalIn>0 && C.ar>0 && C.ar<0.25){
+    adv.push(`資産収入は月${fmt(C.assetIn)}円（${ap}%）あります。目標25%（月${fmt(Math.round(C.totalIn*0.25))}円）まであと月${fmt(Math.round(C.totalIn*0.25-C.assetIn))}円です`);
+  } else if(score>=20 && C.totalIn>0 && C.ar>=0.25){
+    adv.push(`資産収入比率${ap}%は上位水準です。AIコンテンツ・SaaSによる完全自動収入のさらなる多角化がNext Stepです`);
+  }
+
+  if(C.totalLi>0 && dm!==null && dm>36){
+    adv.push(`負債${fmt(C.totalLi)}円は月収の${dm}ヶ月分です。クレカ・消費者金融（年15〜18%）から優先完済し、完済後の返済額を資産形成に転換してください`);
+  } else if(C.totalLi>0 && dm!==null && dm>12){
+    adv.push(`負債${fmt(C.totalLi)}円（月収${dm}ヶ月分）は管理可能ですが、クレカ残高は最優先で完済してください`);
+  } else if(C.totalLi>0 && dm!==null){
+    adv.push(`負債${fmt(C.totalLi)}円（月収${dm}ヶ月分）は健全な水準です。返済ペースを維持しつつ、完済後の余剰の使い道を今から計画しておいてください`);
+  } else if(C.totalLi===0 && score>=60){
+    adv.push(`無借金は強力な土台です。今後は「その借入が収入を生むか」を唯一の判断基準にしてください`);
+  }
+
+  if(score<20){
+    adv.push(`今は副業・投資より先決があります。生活費3ヶ月分（${fmt(Math.round(C.totalEx*3))}円）を現金で持つことが最初のマイルストーンです`);
+  } else if(score<40){
+    adv.push(`週2〜3本のnote記事（¥500〜¥1,000）を3ヶ月継続することで月1万円の事業収入が見えてきます。まず1本書くことから始めてください`);
+  } else if(score<60 && C.totalIn>0){
+    if(C.sr<0.2){
+      adv.push(`まず貯蓄率20%（月${fmt(Math.round(C.totalIn*0.2))}円）の達成を最初のゴールにしてください。達成後に副業・資産形成への投入比率を引き上げます`);
+    } else {
+      adv.push(`月収の25%（${fmt(Math.round(C.totalIn*0.25))}円）を副業・資産形成の専用口座に固定投入するフェーズです。今月中に自動振替を1本設定してください`);
+    }
+  } else if(score<80){
+    adv.push(`AIコンテンツ・配当再投資で資産収入を積み上げるフェーズです。副業収入が月20万円を超えたら法人化で節税メリットが生まれます`);
+  } else {
+    const gap=Math.max(0,C.totalEx-C.assetIn);
+    if(gap>0){
+      adv.push(`資産収入（月${fmt(C.assetIn)}円）が生活費（月${fmt(C.totalEx)}円）を超えるまであと${fmt(gap)}円。この差を埋めることがFIRE達成の唯一のゴールです`);
+    } else {
+      adv.push(`資産収入が生活費を上回っています。収入の50%以上を資産に再投資し、完全経済的独立を盤石にしてください`);
+    }
+  }
+
+  return adv;
+}
+
+function focusNext(currentInp){
+  const all = Array.from(document.querySelectorAll('.finput'));
+  const idx = all.indexOf(currentInp);
+  if(idx >= 0 && idx < all.length - 1){
+    all[idx+1].focus(); all[idx+1].select();
+  } else { currentInp.blur(); }
+}
+
+function makeFieldPair(label, stateObj, key, accent){
+  const s = stateObj[key];
+  const wrap = document.createElement('div');
+  wrap.className = 'field';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = label;
+  wrap.appendChild(lbl);
+
+  const rowM = document.createElement('div');
+  rowM.className = 'field-row';
+  const symM = document.createElement('span'); symM.className='sym'; symM.textContent='¥';
+  const inpM = document.createElement('input');
+  inpM.type='number'; inpM.inputMode='numeric'; inpM.placeholder='0'; inpM.className='finput';
+  inpM.value = s.month;
+  const unitM = document.createElement('span'); unitM.className='unit'; unitM.textContent='/月';
+  rowM.appendChild(symM); rowM.appendChild(inpM); rowM.appendChild(unitM);
+  wrap.appendChild(rowM);
+
+  const rowD = document.createElement('div');
+  rowD.className = 'field-day';
+  const symD = document.createElement('span'); symD.className='sym'; symD.textContent='¥';
+  const inpD = document.createElement('input');
+  inpD.type='number'; inpD.inputMode='numeric'; inpD.placeholder='0'; inpD.className='finput';
+  inpD.value = s.day;
+  const unitD = document.createElement('span'); unitD.className='unit'; unitD.textContent='/日';
+  rowD.appendChild(symD); rowD.appendChild(inpD); rowD.appendChild(unitD);
+  wrap.appendChild(rowD);
+
+  function applyAutoStyle(){
+    inpM.style.color = s.monthAuto ? '#b0bac6' : '';
+    inpM.style.fontStyle = s.monthAuto ? 'italic' : '';
+    inpD.style.color = s.dayAuto ? '#b0bac6' : '';
+    inpD.style.fontStyle = s.dayAuto ? 'italic' : '';
+  }
+  applyAutoStyle();
+
+  inpM.addEventListener('focus', ()=>{ inpM.style.borderColor=accent; inpM.style.background='#fff'; inpM.select(); });
+  inpM.addEventListener('blur',  ()=>{ inpM.style.borderColor='#e2e8f0'; inpM.style.background='#f8fafc'; });
+  inpD.addEventListener('focus', ()=>{ inpD.style.borderColor=accent+'99'; inpD.style.background='#fff'; inpD.select(); });
+  inpD.addEventListener('blur',  ()=>{ inpD.style.borderColor='#e8edf2'; inpD.style.background='#f8fafc'; });
+
+  [inpM, inpD].forEach(inp=>{ inp.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key==='Next'){e.preventDefault();focusNext(inp);} }); });
+
+  inpM.addEventListener('input', e=>{
+    let v = parseFloat(e.target.value);
+    if(!isNaN(v) && v > MAX){ v=MAX; e.target.value=MAX; }
+    s.month = e.target.value;
+    s.monthAuto = false;
+    if(s.day === '' || s.dayAuto){
+      const dayVal = isNaN(v) ? '' : Math.round(v/31);
+      s.day = dayVal === '' ? '' : String(dayVal);
+      s.dayAuto = s.day !== '';
+      inpD.value = s.day;
+    }
+    applyAutoStyle();
+    updateDashboardOnly(); updateCardTotals();
+  });
+
+  inpD.addEventListener('input', e=>{
+    let v = parseFloat(e.target.value);
+    if(!isNaN(v) && v > MAX){ v=MAX; e.target.value=MAX; }
+    s.day = e.target.value;
+    s.dayAuto = false;
+    if(s.month === '' || s.monthAuto){
+      const monVal = isNaN(v) ? '' : Math.min(Math.round(v*31), MAX);
+      s.month = monVal === '' ? '' : String(monVal);
+      s.monthAuto = s.month !== '';
+      inpM.value = s.month;
+    }
+    applyAutoStyle();
+    updateDashboardOnly(); updateCardTotals();
+  });
+
+  return wrap;
+}
+
+function makeField(label, stateObj, key, accent){
+  const wrap = document.createElement('div'); wrap.className='field';
+  const lbl  = document.createElement('div'); lbl.className='field-label'; lbl.textContent=label;
+  const row  = document.createElement('div'); row.className='field-row';
+  const sym  = document.createElement('span'); sym.className='sym'; sym.textContent='¥';
+  const inp  = document.createElement('input');
+  inp.type='number'; inp.inputMode='numeric'; inp.placeholder='0'; inp.className='finput';
+  const isObj = typeof stateObj[key] === 'object';
+  inp.value = isObj ? stateObj[key].month : stateObj[key];
+  const unitM = document.createElement('span'); unitM.className='unit'; unitM.textContent='/月';
+  inp.addEventListener('focus',()=>{ inp.style.borderColor=accent; inp.style.background='#fff'; inp.select(); });
+  inp.addEventListener('blur', ()=>{ inp.style.borderColor='#e2e8f0'; inp.style.background='#f8fafc'; });
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key==='Next'){e.preventDefault();focusNext(inp);} });
+  inp.addEventListener('input', e=>{
+    let v=parseFloat(e.target.value);
+    if(!isNaN(v)&&v>MAX){v=MAX;e.target.value=MAX;}
+    if(isObj){ stateObj[key].month=e.target.value; stateObj[key].monthAuto=false; }
+    else { stateObj[key]=e.target.value; }
+    updateDashboardOnly(); updateCardTotals();
+  });
+  row.appendChild(sym); row.appendChild(inp);
+  if(isObj) row.appendChild(unitM);
+  wrap.appendChild(lbl); wrap.appendChild(row);
+  return wrap;
+}
+
+function updateDashboardOnly(){
+  const C=calc(), st=getStage(C.score, C.invalidEx);
+  const R=54, circ=2*Math.PI*R, off=circ-(circ*C.score/100);
+  const arc=document.getElementById('score-arc');
+  if(arc){arc.setAttribute('stroke-dashoffset',off);arc.setAttribute('stroke',st.c);}
+  const sn=document.getElementById('score-num');
+  if(sn){sn.textContent=C.score;sn.style.color=st.c;}
+  const ei=document.getElementById('total-in'); if(ei) ei.textContent=`¥${fmt(C.totalIn)}`;
+  const ex=document.getElementById('total-ex'); if(ex) ex.textContent=`¥${fmt(C.totalEx)}`;
+  const ec=document.getElementById('total-cf');
+  if(ec){ec.textContent=`${C.cf>=0?'+':''}¥${fmt(C.cf)}`;ec.style.color=C.cf>=0?'#059669':'#dc2626';}
+}
+
+function updateCardTotals(){
+  const C=calc();
+  const map={'card-total-labor':C.laborIn,'card-total-biz':C.bizIn,'card-total-asset':C.assetIn,'card-total-exp':C.totalEx,'card-total-liab':C.totalLi};
+  Object.entries(map).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.textContent=`¥${fmt(val)}`+(id==='card-total-liab'?' 残高':'/月');});
+  const cf=document.getElementById('card-cf');
+  if(cf){cf.textContent=`${C.cf>=0?'+':''}¥${fmt(C.cf)}`;cf.style.color=C.cf>=0?'#059669':'#dc2626';}
+  const cfBox=document.getElementById('cf-box');
+  if(cfBox){cfBox.style.background=C.cf>=0?'#ecfdf5':'#fef2f2';cfBox.style.border=`1.5px solid ${C.cf>=0?'#a7f3d0':'#fecaca'}`;}
+  const sr=document.getElementById('card-sr');if(sr)sr.textContent=C.totalIn>0?pct(C.sr):'—';
+  const itn=document.getElementById('income-total-num');
+  if(itn){itn.textContent=`¥${fmt(C.totalIn)}`;itn.style.color=C.cf>=0?'#059669':'#dc2626';}
+  const incBox=document.getElementById('income-total-box');
+  if(incBox){incBox.style.background=C.cf>=0?'#ecfdf5':'#fef2f2';incBox.style.border=`1.5px solid ${C.cf>=0?'#a7f3d0':'#fecaca'}`;}
+}
+
+function switchTab(t){currentTab=t;renderAll();}
+
+function renderAll(){
+  const C=calc(), st=getStage(C.score, C.invalidEx), ac=st.c;
+  const R=54, circ=2*Math.PI*R, off=circ-(circ*C.score/100);
+
+  const tb=document.getElementById('tabbar'); tb.innerHTML='';
+  [['dashboard','📊','スコア'],['income','💴','収入'],['expense','📤','支出'],['liability','🏦','負債']].forEach(([id,icon,lbl])=>{
+    const b=document.createElement('button');
+    b.className='tab'+(currentTab===id?' active':'');
+    if(currentTab===id){b.style.color=ac;b.style.borderBottomColor=ac;}
+    b.innerHTML=`<span class="icon">${icon}</span><span>${lbl}</span>`;
+    b.onclick=()=>switchTab(id); tb.appendChild(b);
+  });
+
+  const body=document.getElementById('body'); body.innerHTML='';
+
+  if(currentTab==='dashboard'){
+    const sc=document.createElement('div'); sc.className='score-card';
+    sc.innerHTML=`<div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+        <div class="gauge-wrap">
+          <svg width="132" height="132" viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="${R}" fill="none" stroke="#f1f5f9" stroke-width="13"/>
+            <circle id="score-arc" cx="65" cy="65" r="${R}" fill="none" stroke="${ac}" stroke-width="13" stroke-linecap="round"
+              stroke-dasharray="${circ}" stroke-dashoffset="${off}" transform="rotate(-90 65 65)"
+              style="transition:stroke-dashoffset .9s cubic-bezier(.4,0,.2,1),stroke .5s"/>
+          </svg>
+          <div class="gauge-num">
+            <span id="score-num" style="font-size:40px;font-weight:900;color:${ac};line-height:1">${C.score}</span>
+            <span style="font-size:11px;color:#94a3b8;margin-top:2px">/ 100</span>
+            <span style="font-size:11px;color:#94a3b8;margin-top:3px;text-align:center;font-weight:600">財務セルフチェック指数</span>
+          </div>
+        </div>
+        <span style="font-size:5px;color:#cbd5e1;margin-top:4px;letter-spacing:-0.01em;text-align:center">※入力値に基づく参考値です</span>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:24px;margin-bottom:4px">${st.e}</div>
+        <div style="font-weight:800;font-size:15px;color:#1e293b">${st.label}</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:#94a3b8">月収入</span><span id="total-in" style="font-size:12px;font-weight:700;color:#334155">¥${fmt(C.totalIn)}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:#94a3b8">月支出</span><span id="total-ex" style="font-size:12px;font-weight:700;color:#334155">¥${fmt(C.totalEx)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding-top:5px;border-top:1px solid #f1f5f9"><span style="font-size:12px;color:#94a3b8">月CF</span><span id="total-cf" style="font-size:12px;font-weight:700;color:${C.cf>=0?'#059669':'#dc2626'}">${C.cf>=0?'+':''}¥${fmt(C.cf)}</span></div>
+        </div>
+      </div>
+    </div>`;
+    body.appendChild(sc);
+
+    if(C.invalidEx){
+      const wb=document.createElement('div');
+      wb.style.cssText='background:#fef2f2;border:1.5px solid #fecaca;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#dc2626;display:flex;gap:8px;align-items:flex-start;line-height:1.6';
+      wb.innerHTML=`<span style="flex-shrink:0;font-size:16px">⚠️</span><span>月間支出が想定される数値を下回ったためスコア計測できませんでした。</span>`;
+      body.appendChild(wb);
+    }
+
+    if(C.totalIn>1500000){
+      const ob=document.createElement('div'); ob.className='cap-banner';
+      ob.style.background='#f0f9ff'; ob.style.borderColor='#bae6fd'; ob.style.color='#0369a1';
+      ob.innerHTML=`<span>ℹ️</span><div><strong>対象範囲外の可能性があります</strong><div style="margin-top:2px;color:#64748b">このツールは月収150万円以下の財務構造設計を想定しています。スコアは参考値としてご利用ください。</div></div>`;
+      body.appendChild(ob);
+    }
+
+    {
+      let capInfo=null;
+
+      if(C.totalIn>0){
+        if(C.sr<=-5) capInfo={txt:'貯蓄率-500%以上 → 上限1点',red:true};
+        else if(C.sr<=-3) capInfo={txt:'貯蓄率-300%以上 → 上限10点',red:true};
+        else if(C.sr<=-1) capInfo={txt:'貯蓄率-100%以上 → 上限20点',red:true};
+      }
+
+      if(!capInfo && C.totalIn>0 && C.lr>=.6){
+        capInfo={
+          txt:C.lr>=.8?'労働収入80%以上 → 上限45点':'労働収入60〜80% → 上限65点',
+          red:C.lr>=.8
+        };
+      }
+
+      if(capInfo){
+        const bn=document.createElement('div'); bn.className='cap-banner';
+        bn.style.background=capInfo.red?'#fef2f2':'#fffbeb';
+        bn.style.borderColor=capInfo.red?'#fecaca':'#fde68a';
+        bn.style.color=capInfo.red?'#dc2626':'#d97706';
+        bn.innerHTML=`<span>⚡</span><div><strong>スコア上限適用中</strong><div style="margin-top:2px;color:#64748b">${capInfo.txt}（キャッシュフロー思考）</div></div>`;
+        body.appendChild(bn);
+      }
+    }
+
+    if(C.score>0){
+      // 無料版：内訳・アクションの代わりに有料版CTAを表示
+      const cta=document.createElement('div');
+      cta.style.cssText='background:#1e1b4b;border-radius:16px;padding:20px 18px;margin-bottom:14px;text-align:center';
+      cta.innerHTML=`
+        <p style="font-size:11px;color:#a5b4fc;margin:0 0 8px;font-weight:600;letter-spacing:.05em">有料版（¥980）でわかること</p>
+        <p style="font-size:13px;color:#fff;line-height:1.8;margin:0 0 16px">
+          📊 スコア内訳（なぜこの点数か）<br>
+          🎯 スコア別の改善アクション<br>
+          💰 収入の構造分析（労働・事業・資産）
+        </p>
+        <a href="https://checkerboard2.gumroad.com/l/gnhdg" target="_blank"
+           style="display:block;background:#fff;color:#1e1b4b;font-weight:800;font-size:14px;padding:13px;border-radius:10px;text-decoration:none;margin-bottom:10px">
+          🔓 詳細診断を見る →
+        </a>
+        <p style="font-size:10px;color:#6366f1;margin:0">返金不可・デジタルダウンロード商品</p>`;
+      body.appendChild(cta);
+    }
+  }
+
+  if(currentTab==='income'){
+    const hint=document.createElement('div'); hint.className='hint';
+    hint.style.cssText='background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8';
+    hint.innerHTML='💡 <strong>ポイント：</strong>🌟資産収入（寝ていても入る収入）を増やすとスコアが大きく伸びます。<br><span style="font-size:11px;color:#6b7280">💡 日額を入力すると月額（×31）が自動計算されます</span>';
+    body.appendChild(hint);
+
+    const makeCard=(title,accent,idSuffix,rows)=>{
+      const card=document.createElement('div'); card.className='card';
+      const ch=document.createElement('div'); ch.className='card-head'; ch.style.background=accent+'22';
+      const tot=rows.reduce((s,[,o,k])=>s+mVal(o[k]),0);
+      ch.innerHTML=`<span style="font-weight:700;font-size:13px;color:${accent}">${title}</span><span id="card-total-${idSuffix}" style="font-weight:800;font-size:13px;color:${accent}">¥${fmt(tot)}/月</span>`;
+      card.appendChild(ch);
+      const cb=document.createElement('div'); cb.className='card-body';
+      rows.forEach(([label,obj,key])=>cb.appendChild(makeFieldPair(label,obj,key,accent)));
+      card.appendChild(cb); body.appendChild(card);
+    };
+
+    {
+      const card=document.createElement('div'); card.className='card';
+      const ch=document.createElement('div'); ch.className='card-head'; ch.style.background='#64748b22';
+      const tot=mVal(state.inc.salary)+mVal(state.inc.parttime);
+      ch.innerHTML=`<span style="font-weight:700;font-size:13px;color:#64748b">⬜ 労働収入　時間を売る収入</span><span id="card-total-labor" style="font-weight:800;font-size:13px;color:#64748b">¥${fmt(tot)}/月</span>`;
+      card.appendChild(ch);
+      const cb=document.createElement('div'); cb.className='card-body';
+      cb.appendChild(makeFieldPair('給与・賞与（月換算）',state.inc,'salary','#64748b'));
+      cb.appendChild(makeField('アルバイト・パート',state.inc,'parttime','#64748b'));
+      card.appendChild(cb); body.appendChild(card);
+    }
+    makeCard('🔷 事業収入　スキルを売る収入','#3b82f6','biz',[
+      ['フリーランス収入',state.inc,'freelance'],
+      ['副業・その他事業収入',state.inc,'bizOther']
+    ]);
+    makeCard('🌟 資産収入　寝ていても入る収入','#059669','asset',[
+      ['配当・分配金（投資）',state.inc,'dividend'],
+      ['家賃・不動産収入',state.inc,'rental'],
+      ['AI副業・ロイヤリティ',state.inc,'royalty'],
+      ['その他資産収入',state.inc,'assetOther']
+    ]);
+
+    const tb2=document.createElement('div'); tb2.className='total-box'; tb2.id='income-total-box';
+    tb2.style.cssText=`background:${C.cf>=0?'#ecfdf5':'#fef2f2'};border:1.5px solid ${C.cf>=0?'#a7f3d0':'#fecaca'}`;
+    tb2.innerHTML=`<p style="font-size:12px;color:#6b7280;margin:0 0 4px">月収合計</p><p style="font-size:30px;font-weight:900;margin:0"><span id="income-total-num" style="color:${C.cf>=0?'#059669':'#dc2626'}">¥${fmt(C.totalIn)}</span><span style="font-size:14px;font-weight:500;color:#6b7280">/月</span></p>`;
+    body.appendChild(tb2);
+  }
+
+  if(currentTab==='expense'){
+    const hint=document.createElement('div'); hint.className='hint';
+    hint.style.cssText='background:#fffbeb;border-color:#fde68a;color:#92400e';
+    hint.innerHTML='💡 <strong>ポイント：</strong>支出削減＝副業の原資。貯蓄率20%以上を目指しましょう。<br><span style="font-size:11px;color:#6b7280">💡 日額を入力すると月額（×31）が自動計算されます</span>';
+    body.appendChild(hint);
+
+    const card=document.createElement('div'); card.className='card';
+    const ch=document.createElement('div'); ch.className='card-head'; ch.style.background='#ef444422';
+    ch.innerHTML=`<span style="font-weight:700;font-size:13px;color:#ef4444">📤 月間支出</span><span id="card-total-exp" style="font-weight:800;font-size:13px;color:#ef4444">¥${fmt(C.totalEx)}/月</span>`;
+    card.appendChild(ch);
+    const cb=document.createElement('div'); cb.className='card-body';
+    [
+      ['🏠 住居費（家賃・ローン）',state.exp,'housing'],
+      ['💡 光熱・通信費',state.exp,'utilities'],
+      ['🏥 保険料',state.exp,'insurance'],
+    ].forEach(([l,o,k])=>cb.appendChild(makeField(l,o,k,'#ef4444')));
+    [
+      ['📦 その他支出',state.exp,'other'],
+      ['🎮 娯楽・交際費',state.exp,'entertainment'],
+      ['📚 自己投資・教育費',state.exp,'education'],
+      ['🚃 交通費',state.exp,'transport'],
+      ['🍱 食費',state.exp,'food'],
+    ].forEach(([l,o,k])=>cb.appendChild(makeFieldPair(l,o,k,'#ef4444')));
+    card.appendChild(cb); body.appendChild(card);
+
+    const cfBox=document.createElement('div'); cfBox.className='total-box'; cfBox.id='cf-box';
+    cfBox.style.cssText=`background:${C.cf>=0?'#ecfdf5':'#fef2f2'};border:1.5px solid ${C.cf>=0?'#a7f3d0':'#fecaca'}`;
+    cfBox.innerHTML=`<p style="font-size:12px;color:#6b7280;margin:0 0 4px">月間キャッシュフロー</p>
+      <p style="font-size:30px;font-weight:900;margin:0 0 6px"><span id="card-cf" style="color:${C.cf>=0?'#059669':'#dc2626'}">${C.cf>=0?'+':''}¥${fmt(C.cf)}</span><span style="font-size:14px;font-weight:500;color:#6b7280">/月</span></p>
+      <p style="font-size:12px;color:#6b7280;margin:0">貯蓄率 <strong id="card-sr" style="color:#334155">${C.totalIn>0?pct(C.sr):'—'}</strong> <span style="color:#94a3b8">（目標20%以上）</span></p>`;
+    body.appendChild(cfBox);
+  }
+
+  if(currentTab==='liability'){
+    const hint=document.createElement('div'); hint.className='hint';
+    hint.style.cssText='background:#f5f3ff;border-color:#ddd6fe;color:#4c1d95';
+    hint.innerHTML='💡 <strong>ポイント：</strong>高利子（クレカ・消費者金融）から優先返済。負債ゼロで満点20pt！';
+    body.appendChild(hint);
+
+    const card=document.createElement('div'); card.className='card';
+    const ch=document.createElement('div'); ch.className='card-head'; ch.style.background='#7c3aed22';
+    ch.innerHTML=`<span style="font-weight:700;font-size:13px;color:#7c3aed">🏦 負債残高（総額）</span><span id="card-total-liab" style="font-weight:800;font-size:13px;color:#7c3aed">¥${fmt(C.totalLi)} 残高</span>`;
+    card.appendChild(ch);
+    const cb=document.createElement('div'); cb.className='card-body';
+    [
+      ['🏠 住宅ローン残高',state.liab,'mortgage'],
+      ['🚗 車・マイカーローン',state.liab,'carLoan'],
+      ['🎓 奨学金残高',state.liab,'studentLoan'],
+      ['💳 クレジットカード残高',state.liab,'creditCard'],
+      ['💸 その他借入',state.liab,'other']
+    ].forEach(([l,o,k])=>cb.appendChild(makeField(l,state.liab,k,'#7c3aed')));
+    card.appendChild(cb); body.appendChild(card);
+
+    const liCol=C.totalLi===0?'#059669':C.dm<=12?'#2563eb':C.dm<=24?'#d97706':'#dc2626';
+    const liTxt=C.totalLi===0?'✅ 無借金（満点！）':C.dm<=12?'🟡 良好':C.dm<=24?'🟠 要注意':'🔴 要改善';
+    const meta=document.createElement('div');
+    meta.style.cssText='background:#fff;border-radius:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);padding:14px 16px';
+    meta.innerHTML=`<div class="meta-row"><span style="font-size:13px;color:#64748b">負債総額</span><span style="font-size:13px;font-weight:700;color:#7c3aed">¥${fmt(C.totalLi)}</span></div>
+      <div class="meta-row"><span style="font-size:13px;color:#64748b">月収との比率</span><span style="font-size:13px;font-weight:700;color:#334155">${C.totalIn>0?fmt(C.dm)+'ヶ月分':'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;padding-top:8px"><span style="font-size:13px;color:#64748b">判定</span><span style="font-size:13px;font-weight:700;color:${liCol}">${liTxt}</span></div>`;
+    body.appendChild(meta);
+
+    const guide=document.createElement('div');
+    guide.style.cssText='background:#fff;border-radius:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);padding:14px 16px;margin-top:14px';
+    guide.innerHTML=`<p style="font-size:12px;font-weight:700;color:#7c3aed;margin:0 0 8px">📋 返済優先順位ガイド</p>
+      ${[['🔴 最優先','クレカリボ・消費者金融（年15〜18%）'],['🟠 優先','カードローン・マイカーローン（年5〜8%）'],['🟡 通常','奨学金・住宅ローン（年1〜3%）']].map(([t,d])=>`<div style="display:flex;gap:8px;margin-bottom:6px;font-size:12px"><span style="font-weight:700;flex-shrink:0;width:52px">${t}</span><span style="color:#64748b">${d}</span></div>`).join('')}`;
+    body.appendChild(guide);
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>
