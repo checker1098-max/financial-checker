@@ -42,7 +42,6 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .gauge-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .total-box{border-radius:16px;padding:16px;text-align:center}
 .cap-banner{border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;gap:8px;align-items:flex-start;border:1.5px solid}
-.upsell{border-radius:16px;padding:14px 16px;margin-top:14px;border:1.5px dashed #cbd5e1;background:#f8fafc;font-size:12px;color:#64748b;line-height:1.6;text-align:center}
 </style>
 </head>
 <body onclick="if(event.target.tagName!=='INPUT')document.activeElement.blur()" ontouchstart="">
@@ -391,9 +390,24 @@ function renderAll(){
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f1f5f9"><span style="font-size:12px;color:#94a3b8">月間キャッシュフロー</span><span id="total-cf" style="font-size:13px;font-weight:700;color:${C.cf>=0?'#059669':'#dc2626'}">${C.cf>=0?'+':''}¥${fmt(C.cf)}</span></div>`;
     body.appendChild(totals);
 
-    const up=document.createElement('div'); up.className='upsell';
-    up.innerHTML='詳しいスコアの内訳や、改善のための具体的なアドバイスは提供していません。';
-    body.appendChild(up);
+    if(C.score>0){
+      // 無料版：結果が出た後（スコア>0）に、内訳・アクションの代わりに有料版CTAを表示する。
+      const cta=document.createElement('div');
+      cta.style.cssText='background:#1e1b4b;border-radius:16px;padding:20px 18px;margin-bottom:14px;text-align:center';
+      cta.innerHTML=`
+        <p style="font-size:11px;color:#a5b4fc;margin:0 0 8px;font-weight:600;letter-spacing:.05em">有料版（¥980）でわかること</p>
+        <p style="font-size:13px;color:#fff;line-height:1.8;margin:0 0 16px">
+          📊 スコア内訳（なぜこの点数か）<br>
+          🎯 スコア別の改善アクション<br>
+          💰 収入の構造分析（労働・事業・資産）
+        </p>
+        <a href="https://checkerboard2.gumroad.com/l/gnhdg" target="_blank"
+           style="display:block;background:#fff;color:#1e1b4b;font-weight:800;font-size:14px;padding:13px;border-radius:10px;text-decoration:none;margin-bottom:10px">
+          🔓 詳細診断を見る →
+        </a>
+        <p style="font-size:10px;color:#6366f1;margin:0">返金不可・デジタルダウンロード商品</p>`;
+      body.appendChild(cta);
+    }
   }
 
   // ── 収入タブ(データ集計のみ。内訳グラフ・比率表示なし) ──
