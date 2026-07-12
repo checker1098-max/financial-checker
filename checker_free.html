@@ -42,6 +42,14 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 .gauge-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .total-box{border-radius:16px;padding:16px;text-align:center}
 .cap-banner{border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;gap:8px;align-items:flex-start;border:1.5px solid}
+
+/* ── 共有機能：モーダル・ボタン用スタイル（追加分） ── */
+#share-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:9998;display:none;align-items:center;justify-content:center;padding:20px}
+.share-box{background:#fff;border-radius:20px;padding:20px;max-width:360px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)}
+.share-btn-main{display:block;width:100%;padding:14px;border-radius:14px;font-weight:800;font-size:14px;margin-bottom:14px;cursor:pointer;font-family:inherit;background:#fff;color:#1e1b4b;border:2px solid #1e1b4b}
+.share-btn-save{display:block;width:100%;padding:14px;background:#1e1b4b;color:#fff;border-radius:12px;font-weight:700;font-size:15px;text-align:center;text-decoration:none;margin-bottom:10px;box-sizing:border-box}
+.share-btn-x{display:block;width:100%;padding:14px;background:#000;color:#fff;border-radius:12px;font-weight:700;font-size:15px;text-align:center;text-decoration:none;margin-bottom:10px;box-sizing:border-box}
+.share-btn-close{display:block;width:100%;padding:12px;background:#f1f5f9;color:#64748b;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body onclick="if(event.target.tagName!=='INPUT')document.activeElement.blur()" ontouchstart="">
@@ -57,6 +65,12 @@ input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
     <button onclick="document.getElementById('modal-overlay').style.display='none'" style="width:100%;padding:14px;background:#1e1b4b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">同意して利用する</button>
   </div>
 </div>
+
+<!-- ── 共有機能：結果プレビュー用モーダル（追加分。中身はJSで都度差し替え） ── -->
+<div id="share-modal-overlay">
+  <div class="share-box" id="share-box"></div>
+</div>
+
 <div class="header">
   <p>個人事業主・副業経営者向け 財務セルフチェックツール（無料版）</p>
   <h1>💰 AI財務危険度診断</h1>
@@ -110,7 +124,7 @@ function interp(x, points){
   return points[points.length-1][1];
 }
 
-// ── スコア計算 ──
+// ── スコア計算 ──（元ロジックのまま、一切変更なし）
 // 有料版と全く同じロジックをそのまま使用し、スコアの正確性を維持している。
 // 内訳(sr/ar/nr/各キャップの詳細値など)は計算はするが、無料版では画面に一切出さない。
 function calc(){
@@ -307,6 +321,10 @@ function updateDashboardOnly(){
   const ex=document.getElementById('total-ex'); if(ex) ex.textContent=`¥${fmt(C.totalEx)}`;
   const ec=document.getElementById('total-cf');
   if(ec){ec.textContent=`${C.cf>=0?'+':''}¥${fmt(C.cf)}`;ec.style.color=C.cf>=0?'#059669':'#dc2626';}
+
+  // 共有ボタンの表示/非表示もスコア変化に追従させる（追加分）
+  const shareBtn=document.getElementById('share-trigger-btn');
+  if(shareBtn) shareBtn.style.display = C.score>0 ? 'block' : 'none';
 }
 
 // ── データ集計の即時更新 ──
@@ -324,6 +342,167 @@ function updateCardTotals(){
   const incBox=document.getElementById('income-total-box');
   if(incBox){incBox.style.background=C.cf>=0?'#ecfdf5':'#fef2f2';incBox.style.border=`1.5px solid ${C.cf>=0?'#a7f3d0':'#fecaca'}`;}
 }
+
+/* ════════════════════════════════════════════════════════
+   ここから共有機能（追加分）
+   ・スコア計算(calc/getStage/interp)は一切呼び出すだけで変更しない
+   ・外部ライブラリ不要（canvasのみ）→ オフラインでも動作
+   ════════════════════════════════════════════════════════ */
+
+// シェア時の遷移先（note記事。無料ツールへの導線・有料版への導線を含むランディング）
+const SHARE_LANDING_URL = 'https://note.com/finacker_4442222/n/n566665ced8ab';
+const SHARE_HANDLE = '@FinanciaChecker';
+
+// 角丸パス（ctx.roundRect未対応環境でも動くよう手動実装）
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+// 結果カード画像を1080x1080のcanvasに描画して返す
+function generateShareCanvas(){
+  const C = calc();
+  const st = getStage(C.score, C.fireAchieved);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+
+  // 背景（ブランドカラーのグラデーション）
+  const grad = ctx.createLinearGradient(0,0,0,1080);
+  grad.addColorStop(0,'#1e1b4b');
+  grad.addColorStop(1,'#3730a3');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,1080,1080);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = '28px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillText('個人事業主・副業向け 財務セルフチェック', 540, 110);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 50px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillText('💰 AI財務危険度診断', 540, 172);
+
+  // 白カード
+  const cardX=90, cardY=230, cardW=900, cardH=620;
+  roundRectPath(ctx, cardX, cardY, cardW, cardH, 32);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  // スコアゲージ
+  const cx=540, cy=cardY+220, R=165;
+  ctx.lineWidth = 26;
+  ctx.strokeStyle = '#f1f5f9';
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+
+  const startAngle = -Math.PI/2;
+  const endAngle = startAngle + (Math.PI*2)*Math.max(0.02, C.score/100);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = st.c;
+  ctx.beginPath(); ctx.arc(cx,cy,R,startAngle,endAngle); ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = st.c;
+  ctx.font = '900 118px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillText(String(C.score), cx, cy-8);
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '28px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillText('/ 100', cx, cy+58);
+  ctx.textBaseline = 'alphabetic';
+
+  // 絵文字・ラベル
+  ctx.font = '64px sans-serif';
+  ctx.fillText(st.e, cx, cardY+445);
+  ctx.font = '900 46px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillStyle = st.c;
+  ctx.fillText(st.label, cx, cardY+512);
+  ctx.font = '24px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('財務セルフチェック指数', cx, cardY+552);
+  ctx.font = '18px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillText('※入力値に基づく参考値です', cx, cardY+586);
+
+  // フッター（アカウント誘導）
+  ctx.font = '30px "Hiragino Sans","Noto Sans JP",sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('あなたも60秒で無料診断 →', 540, 945);
+  ctx.font = '900 36px sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(SHARE_HANDLE, 540, 995);
+
+  return canvas;
+}
+
+// 共有モーダルを開く（画像プレビュー＋保存＋Xポスト）
+function openShareModal(){
+  const C = calc();
+  if(C.score<=0) return; // 未入力時は何も起きないようにガード
+
+  const canvas = generateShareCanvas();
+  const dataUrl = canvas.toDataURL('image/png');
+
+  const overlay = document.getElementById('share-modal-overlay');
+  const box = document.getElementById('share-box');
+  box.innerHTML = '';
+
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.alt = '診断結果シェア画像';
+  img.style.cssText = 'width:100%;border-radius:14px;margin-bottom:16px;display:block';
+  box.appendChild(img);
+
+  const tweetText = encodeURIComponent(
+    `私の財務セルフチェック指数は${C.score}点でした。\nあなたも60秒で無料診断↓`
+  );
+  const tweetUrl = encodeURIComponent(SHARE_LANDING_URL);
+  const twitterHref = `https://twitter.com/intent/tweet?text=${tweetText}&url=${tweetUrl}`;
+
+  const saveBtn = document.createElement('a');
+  saveBtn.href = dataUrl;
+  saveBtn.download = 'ai-financial-check-result.png';
+  saveBtn.className = 'share-btn-save';
+  saveBtn.textContent = '📥 画像を保存';
+  box.appendChild(saveBtn);
+
+  const tweetBtn = document.createElement('a');
+  tweetBtn.href = twitterHref;
+  tweetBtn.target = '_blank';
+  tweetBtn.rel = 'noopener';
+  tweetBtn.className = 'share-btn-x';
+  tweetBtn.textContent = '𝕏 で結果をポストする';
+  box.appendChild(tweetBtn);
+
+  const note = document.createElement('p');
+  note.style.cssText = 'font-size:11px;color:#94a3b8;text-align:center;margin:2px 0 14px;line-height:1.6';
+  note.textContent = '※Xの投稿画面に画像は自動添付されません。先に「画像を保存」してから、投稿画面に添付してください。';
+  box.appendChild(note);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'share-btn-close';
+  closeBtn.textContent = '閉じる';
+  closeBtn.onclick = ()=>{ overlay.style.display='none'; };
+  box.appendChild(closeBtn);
+
+  overlay.style.display = 'flex';
+}
+
+document.getElementById('share-modal-overlay').addEventListener('click', function(e){
+  if(e.target === this) this.style.display = 'none';
+});
+
+/* ════════════════════════════════════════════════════════
+   共有機能ここまで
+   ════════════════════════════════════════════════════════ */
 
 function switchTab(t){currentTab=t;renderAll();}
 
@@ -366,6 +545,15 @@ function renderAll(){
         <span style="font-size:10px;color:#cbd5e1;margin-top:8px;text-align:center">※入力値に基づく参考値です</span>
       </div>`;
     body.appendChild(sc);
+
+    // ── 共有ボタン（追加分）：スコアが出ている時だけ表示 ──
+    const shareBtn=document.createElement('button');
+    shareBtn.id='share-trigger-btn';
+    shareBtn.className='share-btn-main';
+    shareBtn.style.display = C.score>0 ? 'block' : 'none';
+    shareBtn.textContent='📤 診断結果をシェアする';
+    shareBtn.onclick=openShareModal;
+    body.appendChild(shareBtn);
 
     // ── 一般的な注意書き(スコア制限の理由説明ではない、単純な入力チェック・適用範囲の案内) ──
     if(C.expSuspicious){
